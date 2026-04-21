@@ -2049,6 +2049,19 @@ class DiscordAdapter(BasePlatformAdapter):
         async def slash_usage(interaction: discord.Interaction):
             await self._run_simple_slash(interaction, "/usage")
 
+        @tree.command(name="cusage", description="Show aggregate Codex usage across all sessions/platforms")
+        @discord.app_commands.describe(days="Optional lookback window in days", source="Optional platform filter", today="Show today-so-far realtime Codex usage")
+        async def slash_cusage(interaction: discord.Interaction, days: int | None = None, source: str = "", today: bool = False):
+            parts = []
+            if today:
+                parts.append("today")
+            elif days is not None and days > 0:
+                parts.append(str(days))
+            if source.strip():
+                parts.extend(["--source", source.strip()])
+            cmd = "/cusage" if not parts else f"/cusage {' '.join(parts)}"
+            await self._run_simple_slash(interaction, cmd)
+
         @tree.command(name="provider", description="Show available providers")
         async def slash_provider(interaction: discord.Interaction):
             await self._run_simple_slash(interaction, "/provider")

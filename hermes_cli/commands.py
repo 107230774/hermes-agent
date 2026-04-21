@@ -107,6 +107,8 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("provider", "Show available providers and current provider",
                "Configuration"),
     CommandDef("gquota", "Show Google Gemini Code Assist quota usage", "Info"),
+    CommandDef("cusage", "Show aggregate Codex usage across all sessions/platforms", "Info",
+               aliases=("codexusage",), args_hint="[today|now|days] [--source name] [--today] [--days N]"),
 
     CommandDef("personality", "Set a predefined personality", "Configuration",
                args_hint="[name]"),
