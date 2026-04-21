@@ -5421,6 +5421,41 @@ class HermesCLI:
             self._console_print(f"    {header:40s}  {bar}  {pct_str}")
         self._console_print()
 
+    def _handle_cusage_command(self, cmd_original: str = "/cusage") -> None:
+        """Show aggregate Codex usage across all persisted sessions/platforms."""
+        try:
+            from agent.codex_usage import CodexUsageEngine, parse_cusage_args
+        except ImportError as exc:
+            self._console_print(f"  [red]Codex usage modules unavailable: {exc}[/]")
+            return
+
+        parts = cmd_original.split(None, 1)
+        raw_args = parts[1].strip() if len(parts) > 1 else ""
+        try:
+            parsed = parse_cusage_args(raw_args)
+        except ValueError as exc:
+            self._console_print(f"  Invalid /cusage arguments: {exc}")
+            return
+
+        db = self._session_db
+        owns_db = False
+        try:
+            if db is None:
+                from hermes_state import SessionDB
+                db = SessionDB()
+                owns_db = True
+            engine = CodexUsageEngine(db)
+            report = engine.generate(days=parsed["days"], source=parsed["source"], today=parsed["today"])
+            self._console_print(engine.format_terminal(report))
+        except Exception as exc:
+            self._console_print(f"  Error generating Codex usage: {exc}")
+        finally:
+            if owns_db and db is not None:
+                try:
+                    db.close()
+                except Exception:
+                    pass
+
     def _handle_personality_command(self, cmd: str):
         """Handle the /personality command to set predefined personalities."""
         parts = cmd.split(maxsplit=1)
@@ -5974,6 +6009,8 @@ class HermesCLI:
             self._manual_compress(cmd_original)
         elif canonical == "usage":
             self._show_usage()
+        elif canonical == "cusage":
+            self._handle_cusage_command(cmd_original)
         elif canonical == "insights":
             self._show_insights(cmd_original)
         elif canonical == "copy":

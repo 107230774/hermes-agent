@@ -30,6 +30,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Optional, Any, List
 
+from hermes_state import SessionDB
+
 # --- Agent cache tuning ---------------------------------------------------
 # Bounds the per-session AIAgent cache to prevent unbounded growth in
 # long-lived gateways (each AIAgent holds LLM clients, tool schemas,
@@ -3565,6 +3567,9 @@ class GatewayRunner:
 
         if canonical == "usage":
             return await self._handle_usage_command(event)
+
+        if canonical == "cusage":
+            return await self._handle_cusage_command(event)
 
         if canonical == "insights":
             return await self._handle_insights_command(event)
@@ -7349,6 +7354,41 @@ class GatewayRunner:
                 f"_(Detailed usage available after the first agent response)_"
             )
         return "No usage data available for this session."
+
+    async def _handle_cusage_command(self, event: MessageEvent) -> str:
+        """Handle /cusage command -- show aggregate Codex usage across sessions/platforms."""
+        from agent.codex_usage import CodexUsageEngine, parse_cusage_args
+
+        raw_args = event.get_command_args().strip()
+        try:
+            parsed = parse_cusage_args(raw_args)
+        except ValueError as exc:
+            return f"Invalid /cusage arguments: {exc}"
+
+        loop = asyncio.get_running_loop()
+
+        def _run_cusage() -> str:
+            db = getattr(self, "_session_db", None)
+            owns_db = False
+            if db is None:
+                db = SessionDB()
+                owns_db = True
+            try:
+                engine = CodexUsageEngine(db)
+                report = engine.generate(days=parsed["days"], source=parsed["source"], today=parsed["today"])
+                return engine.format_terminal(report)
+            finally:
+                if owns_db:
+                    try:
+                        db.close()
+                    except Exception:
+                        pass
+
+        try:
+            return await loop.run_in_executor(None, _run_cusage)
+        except Exception as exc:
+            logger.error("Codex usage command error: %s", exc, exc_info=True)
+            return f"Error generating Codex usage: {exc}"
 
     async def _handle_insights_command(self, event: MessageEvent) -> str:
         """Handle /insights command -- show usage insights and analytics."""
